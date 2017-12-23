@@ -26,6 +26,15 @@ def get_url(url):
         logging.error("get %s error" % (r.url))
         return ""
 
+def downloadchapter2file(chapter_url):
+	chapter_info = get_url(chapter_url)
+	if len(chapter_info) > 0:
+		with open(os.path.join(db_dir, "chapter_db"), "a") as f:
+			try:
+				f.write(chapter_info + "\n")
+			except:
+				logging.error("parser chapter_url chapter error")
+
 def downloadlist2file(list_url):
     list_info = get_url(list_url)
     if len(list_info) > 0:
@@ -36,6 +45,8 @@ def downloadlist2file(list_url):
                     chapter_url = list_url + li.a['href']
                     chapter_title = li.a.string
                     f.write(chapter_url + " " + chapter_title + "\n")
+                    if chapter_url:
+                    	downloadchapter2file(chapter_url)
                 except :
                     logging.error("parser %s error" % li)
 
@@ -58,12 +69,6 @@ def download2file(url):
                 if info_url:
                     list_url = info_url.replace("bookinfo", "html").replace(".html", "/")
                     downloadlist2file(list_url)
-
-
-def log2file(message):
-    print(message)
-    with open(os.path.join(log_dir, "output.log"), "a") as f:
-        f.write(message)
 
 
 def init():
