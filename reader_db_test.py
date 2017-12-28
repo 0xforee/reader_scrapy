@@ -16,10 +16,12 @@ import logging
 
 log_dir="./log"
 db_dir="./db"
+base_url="http://m.piaotian.com"
 def get_url(url):
     # download url content
     try:
         r = requests.get(url)
+        r.encoding = "gbk"
         r.raise_for_status
         return r.text
     except:
@@ -51,24 +53,32 @@ def downloadlist2file(list_url):
                     logging.error("parser %s error" % li)
 
 
-def download2file(url):
+def download_book_info(url):
     content = get_url(url)
     if len(content) > 0:
         soup = BeautifulSoup(content, "html.parser")
-        with open(os.path.join(db_dir, "reader_db"), "a") as f:
-            for tr in soup("tr"):
-                for th in tr("th"):
-                    f.write(th.string + " ")
-                for td in tr("td"):
-                    f.write(td.string + " ")
-                f.write("\n")
-                try:
-                    info_url = tr.td.a['href']
-                except:
-                    info_url = None
-                if info_url:
-                    list_url = info_url.replace("bookinfo", "html").replace(".html", "/")
-                    downloadlist2file(list_url)
+        for line in soup('a', 'blue'):
+            try:
+                info_url = line['href']
+            except:
+                info_url = None
+
+            if info_url:
+                downloadlist2file(base_url + info_url)
+#        with open(os.path.join(db_dir, "reader_db"), "a") as f:
+#            for tr in soup("tr"):
+#                for th in tr("th"):
+#                    f.write(th.string + " ")
+#                for td in tr("td"):
+#                    f.write(td.string + " ")
+#                f.write("\n")
+#                try:
+#                    info_url = tr.td.a['href']
+#                except:
+#                    info_url = None
+#                if info_url:
+#                    list_url = info_url.replace("bookinfo", "html").replace(".html", "/")
+#                    downloadlist2file(list_url)
 
 
 def init():
@@ -91,9 +101,20 @@ def main():
     init()
 
     # generate url
-    for page_index in range(1,2):
-        url = "http://www.piaotian.com/booktopallvisit/0/" + str(page_index) + ".html"
-        download2file(url)
+    for page_index in range(1,463):
+        url = 'http://m.piaotian.com/top/allvote_' + str(page_index)
+        #url = "http://www.piaotian.com/booktopallvisit/0/" + str(page_index) + ".html"
+        content = get_url(url)
+        if len(content) > 0:
+            soup = BeautifulSoup(content, "html.parser")
+            for line in soup('a', 'blue'):
+                try:
+                    info_url = line['href']
+                except:
+                    info_url = None
+
+                if info_url:
+                    download_book_info(base_url + info_url)
         logging.info("get %s done." % (url))
         print("get %s done. " % (url))
 
