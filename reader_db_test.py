@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # vim:fenc=utf-8
 #
@@ -13,10 +13,12 @@ import requests
 from bs4 import BeautifulSoup
 import os
 import logging
+import re
 
 log_dir="./log"
 db_dir="./db"
 base_url="http://m.piaotian.com"
+www_base_url = "http://www.piaotian.com"
 def get_url(url):
     # download url content
     try:
@@ -29,13 +31,18 @@ def get_url(url):
         return ""
 
 def downloadchapter2file(chapter_url):
-	chapter_info = get_url(chapter_url)
-	if len(chapter_info) > 0:
-		with open(os.path.join(db_dir, "chapter_db"), "a") as f:
-			try:
-				f.write(chapter_info + "\n")
-			except:
-				logging.error("parser chapter_url chapter error")
+    print('chapter url = %s' % chapter_url)
+    chapter_info = get_url(chapter_url)
+    if len(chapter_info) > 0:
+        soup = BeautifulSoup(chapter_info, 'html.parser')
+        with open(os.path.join(db_dir, "chapter_db"), "a") as f:
+            try:
+                chapter_info = soup.find('div', id = 'nr1')
+                chapter_info = re.sub(r'{飘天.*}', '',
+                        chapter_info.get_text('\n\n'))
+                f.write(chapter_info + "\n")
+            except:
+                logging.error("parser chapter_url chapter error")
 
 def downloadlist2file(list_url):
     list_info = get_url(list_url)
@@ -44,42 +51,51 @@ def downloadlist2file(list_url):
         with open(os.path.join(db_dir, "list_db"), "a") as f:
             for li in soup('li'):
                 try:
-                    chapter_url = list_url + li.a['href']
-                    chapter_title = li.a.string
+                    if li.a and re.match(r'^[0-9a-z.]+$', li.a['href']):
+                        chapter_url = list_url + li.a['href']
+                        chapter_title = li.a.string
+                    
+                    # convert www_base_url to base_url for split chapter easily
+                    chapter_url = chapter_url.replace(www_base_url, base_url)
+
                     f.write(chapter_url + " " + chapter_title + "\n")
                     if chapter_url:
-                    	downloadchapter2file(chapter_url)
+                        downloadchapter2file(chapter_url)
                 except :
                     logging.error("parser %s error" % li)
 
 
 def download_book_info(url):
     content = get_url(url)
+    info=[]
     if len(content) > 0:
         soup = BeautifulSoup(content, "html.parser")
-        for line in soup('a', 'blue'):
-            try:
-                info_url = line['href']
-            except:
-                info_url = None
+        try:
+            # find book info
+            block = soup.find('div', 'block')
+            print('cover_img = %s' % (block.img['src']))
 
-            if info_url:
-                downloadlist2file(base_url + info_url)
-#        with open(os.path.join(db_dir, "reader_db"), "a") as f:
-#            for tr in soup("tr"):
-#                for th in tr("th"):
-#                    f.write(th.string + " ")
-#                for td in tr("td"):
-#                    f.write(td.string + " ")
-#                f.write("\n")
-#                try:
-#                    info_url = tr.td.a['href']
-#                except:
-#                    info_url = None
-#                if info_url:
-#                    list_url = info_url.replace("bookinfo", "html").replace(".html", "/")
-#                    downloadlist2file(list_url)
+            book_info = block.find('div', 'block_txt2')
+            for child in book_info('p'):
+                item = ''
+                if child.string:
+                    info.append(child.string)
+                    print(child.string)
+                else:
+                    for string in child.strings:
+                        item = item + string
+                    info.append(item)
+                    print(item)
 
+            # get content url
+            list_url = www_base_url + soup('span')[1].a['href'].replace('index.html', '')
+            print('章节目录:' + list_url)
+        except:
+            pass
+
+        if list_url:
+            # use www_base_url for get content only once
+            downloadlist2file(list_url)
 
 def init():
     # create dir if not exits
@@ -101,9 +117,10 @@ def main():
     init()
 
     # generate url
-    for page_index in range(1,463):
-        url = 'http://m.piaotian.com/top/allvote_' + str(page_index)
+    for page_index in range(1, 2):
+        url = base_url + '/top/allvote_' + str(page_index)
         #url = "http://www.piaotian.com/booktopallvisit/0/" + str(page_index) + ".html"
+        print("get %s starting..." % url )
         content = get_url(url)
         if len(content) > 0:
             soup = BeautifulSoup(content, "html.parser")
@@ -119,4 +136,5 @@ def main():
         print("get %s done. " % (url))
 
 
-main()
+if __name__ == '__main__':
+    main()
