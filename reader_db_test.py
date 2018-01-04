@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 import os
 import logging
 import re
+import pymongo
 
 log_dir="./log"
 db_dir="./db"
@@ -22,6 +23,7 @@ www_base_url = "http://www.piaotian.com"
 
 book = None
 
+books = None
 
 class Book():
     host = {}
@@ -66,7 +68,10 @@ class Book():
     def set_cover_url(self, url):
         self.cover_url = url
 
-    def insert_db(selft):
+    def set_description(self, description):
+        self.description = description
+
+    def insert_db(self):
         book = {
                 'host': self.host,
                 'name': self.name,
@@ -79,7 +84,10 @@ class Book():
                 'contents': self.contents,
                 'description': self.description
         }
+        print('insert books db')
         # insert mongodb
+        global books
+        books.insert(book)
         pass
 
 
@@ -143,7 +151,8 @@ def downloadlist2file(list_url):
                             pass
                         i = i+1
                         if i > 10:
-                            return
+                            pass
+                            #return
                 except Exception as e:
                     print('parse error ' + str(e))
                     logging.error("parser %s error  = " % (li) + str(e))
@@ -156,6 +165,10 @@ def download_book_info(url):
     if len(content) > 0:
         soup = BeautifulSoup(content, "html.parser")
         try:
+            # find intro_info
+            intro_info = soup.find('div', 'intro_info')
+            book.set_description(intro_info.string)
+
             # find book info
             block = soup.find('div', 'block')
             print('cover_img = %s' % (block.img['src']))
@@ -199,7 +212,14 @@ def init():
     # init logging config
     message_fmt="%(asctime)s %(process)d %(levelname)s/%(funcName)s(%(lineno)d): %(message)s"
     datefmt="%Y-%m-%d %H:%M:%S"
-    logging.basicConfig(filename="/var/log/reader_db.log", level=logging.INFO, format=message_fmt, datefmt=datefmt)
+    logging.basicConfig(filename="./log/reader_db.log", level=logging.INFO, format=message_fmt, datefmt=datefmt)
+
+    # init mongodb
+    client = pymongo.MongoClient('localhost')
+
+    reader_db = client.reader_db
+    global books
+    books = reader_db.books
 
 
 def main():
@@ -207,7 +227,7 @@ def main():
     init()
 
     # generate url
-    for page_index in range(1, 2):
+    for page_index in range(1, 432):
         url = base_url + '/top/allvote_' + str(page_index)
         #url = "http://www.piaotian.com/booktopallvisit/0/" + str(page_index) + ".html"
         # init book
@@ -229,6 +249,7 @@ def main():
                     book.set_url(base_url + info_url)
                 print(book.__dict__)
                 print(book.contents)
+                book.insert_db()
         logging.info("get %s done." % (url))
         print("get %s done. " % (url))
 
